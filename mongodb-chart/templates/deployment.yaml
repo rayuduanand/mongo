@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mongodb-chart.fullname" . }}
+  namespace: {{ .Values.db.namespace }}
+  labels:
+    {{- include "mongodb-chart.labels" . | nindent 4 }}
+    {{- toYaml .Values.deploy.extraLabels | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "mongodb-chart.selectorLabels" . | nindent 6 }}
+      {{- toYaml .Values.pod.extraLabels | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "mongodb-chart.selectorLabels" . | nindent 8 }}
+        {{- toYaml .Values.pod.extraLabels | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}      
+      
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:          
+          {{- include "mongodb-chart.list-env-variables" . | indent 10 }}
+          volumeMounts:
+          - name: {{ .Values.volumeMount.name }}
+            mountPath: {{ .Values.volumeMount.path }}
+            readOnly: {{ .Values.volumeMount.readOnly }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP          
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+      - name: {{ .Values.volumeMount.name }}
+        secret:
+          secretName: {{ include "mongodb-chart.fullname" . }}
+          items:
+          {{- include "mongodb-chart.list-volume-items" . | indent 10 }}
+     
